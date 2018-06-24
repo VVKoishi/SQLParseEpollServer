@@ -427,7 +427,18 @@ void ActionMain(int fd){
             my_update(table_name, where_column, where_value, change_columns, change_values, num_columns);
             continue;
         }
-        else if(strcmp(dysInfo[dindex], "DELETE")==0){}
+        else if(strcmp(dysInfo[dindex], "DELETE")==0){
+            dindex++;//delete
+            dindex++;//from
+            const char *table_name = dysInfo[dindex++];
+            dindex++;//where
+            const char *where_column = dysInfo[dindex++];
+            dindex++;//=
+            const char *where_value = dysInfo[dindex++];
+            dindex++;//;
+            my_delete(table_name, where_column, where_value);
+            continue;
+        }
         else if(strcmp(dysInfo[dindex], "CREATE")==0){}
         else if(strcmp(dysInfo[dindex], "DROP")==0){}
         // printf("%d,%d",dindex,maxindex);
