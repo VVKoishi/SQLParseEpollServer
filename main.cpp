@@ -37,6 +37,12 @@ void commit(){
     Writer<FileWriteStream> writer(os);
     d.Accept(writer);
     fclose(fp2);
+    //文件读取
+    FILE* fp = fopen("soft_base_sql.json", "r");
+    char readBuffer[65536];
+    FileReadStream is(fp, readBuffer, sizeof(readBuffer));
+    d.ParseStream(is);
+    fclose(fp);
 }
 void parse(char *buff){
     //将buff存入sql文件
@@ -141,8 +147,9 @@ void my_select(int fd, const char *table_name, const char columns_list[][20], in
                 for (auto& z : y.GetObject()){
                     // printf("%s: %d\t", z.name.GetString(), z.value.GetInt());
                     //若不在视图中，则跳过
-                    if(!searchList(z.name.GetString(), columns_list, num_columns)) continue;
-                    for (auto& c : (string)z.name.GetString()) str.push_back(c);
+                    const char *name = z.name.GetString();
+                    if(!searchList(name, columns_list, num_columns)) continue;
+                    for (auto& c : (string)name) str.push_back(c);
                     str.push_back(':');
                     str.push_back(' ');
                     for (auto& c : (string)z.value.GetString()) str.push_back(c);
@@ -172,8 +179,9 @@ void my_select(int fd, const char *table_name, const char columns_list[][20], in
                         for (auto& m : y.GetObject()){
                             // printf("%s: %d\t", m.name.GetString(), m.value.GetInt());
                             //若不在视图中，则跳过
-                            if(!searchList(m.name.GetString(), columns_list, num_columns)) continue;
-                            for (auto& c : (string)m.name.GetString()) str.push_back(c);
+                            const char *name = m.name.GetString();
+                            if(!searchList(name, columns_list, num_columns)) continue;
+                            for (auto& c : (string)name) str.push_back(c);
                             str.push_back(':');
                             str.push_back(' ');
                             for (auto& c : (string)m.value.GetString()) str.push_back(c);
@@ -217,7 +225,7 @@ void my_insert(int fd, const char *table_name, const char values_list[][20], int
 
             int i=0;
             for (auto& y : x["columns"].GetArray()){
-                item.AddMember(y, values_list[i], d.GetAllocator());
+                item.AddMember(StringRef(y.GetString()), StringRef(values_list[i]), d.GetAllocator());
                 i++;
             }
             
@@ -230,7 +238,7 @@ void my_insert(int fd, const char *table_name, const char values_list[][20], int
     return;
 }
 //行插入 未实现id值唯一等条件
-void my_insert(const char *table_name, const char columns_list[][20], const char values_list[][20], int num_columns){
+void my_insert(int fd, const char *table_name, const char columns_list[][20], const char values_list[][20], int num_columns){
     for (auto& x : d.GetArray()){
         //匹配对应的TABLE
         if (strcmp( x["type"].GetString(), "table")==0 && strcmp( x["name"].GetString(), table_name)==0) {
@@ -242,13 +250,15 @@ void my_insert(const char *table_name, const char columns_list[][20], const char
             }
             
             x["data"].PushBack(item, d.GetAllocator());
+            char mail[50] = "Finished.\n";
+            write(fd, mail, sizeof(mail));
             return;
         }
     }
     return;
 }
 //点修改 修改所有匹配到的值的行的点
-void my_update(const char *table, const char *where_column, const char *where_value, const char change_columns[][20], const char change_values[][20], int num_columns){
+void my_update(int fd, const char *table, const char *where_column, const char *where_value, const char change_columns[][20], const char change_values[][20], int num_columns){
     for (auto& x : d.GetArray()){
         //匹配对应的TABLE
         if (strcmp( x["type"].GetString(), "table")==0 && strcmp( x["name"].GetString(), table)==0) {
@@ -271,18 +281,20 @@ void my_update(const char *table, const char *where_column, const char *where_va
             }
         }
     }
+    char mail[50] = "Finished.\n";
+    write(fd, mail, sizeof(mail));
     return;
 }
 //点删除 删除所有匹配到的值的行
-void my_delete(const char *table, const char *where_column, const char *where_value){
+void my_delete(int fd, const char *table, const char *where_column, const char *where_value){
     for (auto& x : d.GetArray()){
         //匹配对应的TABLE
         if (strcmp( x["type"].GetString(), "table")==0 && strcmp( x["name"].GetString(), table)==0) {
             //TABLE中DATA的轮询
             Document::ConstValueIterator pos=x["data"].Begin();
-            for (auto & y : x["data"].GetArray()){
+            for (; pos<x["data"].End();){
                 //每一行数据中每个数据轮询
-                for (auto& z : y.GetObject()){
+                for (auto& z : pos->GetObject()){
                     //匹配COLUMN
                     if (strcmp( z.name.GetString(), where_column)==0 && strcmp(z.value.GetString(),where_value)==0) {
                         //匹配成功，删除该行
@@ -294,6 +306,8 @@ void my_delete(const char *table, const char *where_column, const char *where_va
             }
         }
     }
+    char mail[50] = "Finished.\n";
+    write(fd, mail, sizeof(mail));
     return;
 }
 
@@ -424,7 +438,7 @@ void ActionMain(int fd){
             dindex++;//=
             const char *where_value = dysInfo[dindex++];
             dindex++;//;
-            my_update(table_name, where_column, where_value, change_columns, change_values, num_columns);
+            my_update(fd, table_name, where_column, where_value, change_columns, change_values, num_columns);
             continue;
         }
         else if(strcmp(dysInfo[dindex], "DELETE")==0){
@@ -436,7 +450,7 @@ void ActionMain(int fd){
             dindex++;//=
             const char *where_value = dysInfo[dindex++];
             dindex++;//;
-            my_delete(table_name, where_column, where_value);
+            my_delete(fd, table_name, where_column, where_value);
             continue;
         }
         else if(strcmp(dysInfo[dindex], "CREATE")==0){}
@@ -476,38 +490,7 @@ int do_use_fd(int fd)
         parse(buff);
         ActionMain(fd);
         v(sem);
-        // if(buff[0]=='a')
-        // {
-        //     p(sem);
-        //     const char *table_name = "items";
-        //     const char columns_list[2][20] = {"id","policy_id"};
-        //     int num_columns = 2;
-        //     my_select(fd, table_name, columns_list, num_columns);
-        //     v(sem);
-        // }
-        // else if(buff[0]=='b')
-        // {
-        //     p(sem);
-        //     const char *table_name = "items";
-        //     char columns_list[3][20] = {"temp","all","heyhey"};
-        //     char values_list[3][20] = {"ok","12","ma"};
-        //     int num_columns = 3;
-        //     my_insert(table_name, columns_list, values_list, num_columns);
-        //     write(fd, "Finished.\n",10);
-        //     v(sem);
-        // }
-        // else if(buff[0]=='c')
-        // {
-        //     p(sem);
-        //     // my_update(&d, "items", "id", 3, "policy_id", 5);
-        //     v(sem);
-        // }
-        // else if(buff[0]=='d')
-        // {
-        //     p(sem);
-        //     // my_delete(&d, "items", "id", 1);
-        //     v(sem);
-        // }
+        
 
     }    
     return 0;
