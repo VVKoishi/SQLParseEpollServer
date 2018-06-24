@@ -1,0 +1,68 @@
+[
+    {
+        "type": "header",
+        "version": "4.7.2",
+        "comment": "Export to JSON plugin for PHPMyAdmin"
+    },
+    {
+        "type": "database",
+        "name": "soft_base_sql"
+    },
+    {
+        "type": "table",
+        "name": "edges",
+        "columns": ["start","end","price_weight","time_weight"],
+        "database": "soft_base_sql",
+        "data": [
+            {
+                "start": "1",
+                "end": "2",
+                "price_weight": "3",
+                "time_weight": "4"
+            }
+        ]
+    },
+    {
+        "type": "table",
+        "name": "items",
+        "columns": ["id","level","start","end","policy_id"],
+        "database": "soft_base_sql",
+        "data": [
+            {
+                "id": "2",
+                "level": "2",
+                "start": "2",
+                "end": "7",
+                "policy_id": "4"
+            },
+            {
+                "id": "3",
+                "level": "1",
+                "start": "3",
+                "end": "9",
+                "policy_id": "1"
+            },
+            {
+                "id": "4",
+                "level": "4",
+                "start": "1",
+                "end": "10",
+                "policy_id": "1"
+            },
+            {
+                "id": "5",
+                "level": "3",
+                "start": "8",
+                "end": "4",
+                "policy_id": "1"
+            },
+            {
+                "id": "6",
+                "level": "1",
+                "start": "4",
+                "end": "9",
+                "policy_id": "1"
+            }
+        ]
+    }
+]
